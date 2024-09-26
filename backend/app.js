@@ -117,35 +117,34 @@ app.put('/product/:id', upload.single('image'), async (req, res) => {
     const file = req.file;
     let imageUrl;
 
-    // Lấy thông tin cây hiện tại từ Firestore để xóa ảnh cũ
-    const productDoc  = await db.collection('products').doc(req.params.id).get();
+    // Lấy thông tin sản phẩm hiện tại từ Firestore để xóa ảnh cũ
+    const productDoc = await db.collection('products').doc(req.params.id).get();
     if (!productDoc.exists) {
-      return res.status(404).send('Tree not found');
+      return res.status(404).send('Product not found');
     }
     const currentData = productDoc.data();
     const oldImageUrl = currentData.imageUrl;
 
     if (file) {
-      const filePath = path.join(__dirname, 'uploads', file.filename);
-      const fileBuffer = fs.readFileSync(filePath);
+      const fileName = `${uuidv4()}-${file.originalname}`;
 
-      const blob = bucket.file(file.filename);
+      // Tạo blob stream để tải file lên Firebase Storage
+      const blob = bucket.file(fileName);
       const blobStream = blob.createWriteStream({
         resumable: false,
+        contentType: file.mimetype,
       });
 
       blobStream.on('error', (err) => {
         console.error('Error uploading file:', err);
-        res.status(500).send({ message: 'Error uploading image' });
+        return res.status(500).send({ message: 'Error uploading image' });
       });
 
       blobStream.on('finish', async () => {
-        imageUrl = `https://storage.googleapis.com/${bucket.name}/${file.filename}`;
+        imageUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
         await blob.makePublic();
 
-        fs.unlinkSync(filePath);
-
-        // Xóa ảnh cũ trong Firebase Storage
+        // Xóa ảnh cũ trong Firebase Storage nếu có
         if (oldImageUrl) {
           const oldFileName = oldImageUrl.split('/').pop();
           await bucket.file(oldFileName).delete();
@@ -154,20 +153,20 @@ app.put('/product/:id', upload.single('image'), async (req, res) => {
         // Cập nhật URL ảnh mới trong Firestore
         const updatedData = { name, description, imageUrl };
         await db.collection('products').doc(req.params.id).update(updatedData);
-        res.status(200).send({ message: 'Tree updated successfully', imageUrl });
+        return res.status(200).send({ message: 'Product updated successfully', imageUrl });
       });
 
-      blobStream.end(fileBuffer);
+      blobStream.end(file.buffer);
     } else {
       // Nếu không có file mới, chỉ cập nhật tên và mô tả
       const updatedData = { name, description };
       await db.collection('products').doc(req.params.id).update(updatedData);
-      res.status(200).send({ message: 'Tree updated successfully' });
+      return res.status(200).send({ message: 'Product updated successfully' });
     }
 
   } catch (error) {
-    console.error('Error updating tree:', error);
-    res.status(500).send('Error updating tree: ' + error.message);
+    console.error('Error updating product:', error);
+    return res.status(500).send('Error updating product: ' + error.message);
   }
 });
 
