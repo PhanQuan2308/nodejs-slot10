@@ -183,6 +183,10 @@ app.delete("/product/:id", async (req, res) => {
     return res.status(500).send("Error deleting product: " + error.message);
   }
 });
+// API đơn giản để kiểm tra xem ứng dụng có chạy hay không
+app.get("/", (req, res) => {
+  res.status(200).send("Docker is running and the backend is working!");
+});
 
 // Lắng nghe trên cổng 5000
 const port = 5000;

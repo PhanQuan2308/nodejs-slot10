@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  backend:
+    build:
+      context: ./backend  # Đảm bảo thư mục ./backend chứa Dockerfile
+      dockerfile: Dockerfile  # Đảm bảo rằng Dockerfile có đúng tên và không có phần mở rộng
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/usr/src/app
+    environment:
+      - NODE_ENV=development
+    command: node app.js
+
+  frontend:
+    build:
+      context: ./frontend/slot10-nodejs  # Đảm bảo thư mục ./frontend/slot10-nodejs chứa Dockerfile
+      dockerfile: Dockerfile  # Đảm bảo rằng Dockerfile có đúng tên
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/slot10-nodejs:/usr/src/app
+    environment:
+      - NODE_ENV=development
+    command: npm start
