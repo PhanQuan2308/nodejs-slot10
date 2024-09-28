@@ -1,30 +1,27 @@
 const express = require("express");
-const multer = require("multer");
-const cors = require("cors"); // Bổ sung cors ở đây
+const cors = require("cors");
 const admin = require("firebase-admin");
-const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-app.use(express.json()); // Dùng để xử lý JSON từ body của request
+app.use(express.json());
 
-require("dotenv").config(); // Nạp biến môi trường từ file .env
+require("dotenv").config();
 
-// Cấu hình CORS
 const corsOptions = {
-  origin: "http://localhost:3000", // Chỉ cho phép các yêu cầu từ cổng 3000
+  origin: "http://localhost:3000",
   optionsSuccessStatus: 200,
 };
-app.use(cors(corsOptions)); // Sử dụng cors với các tùy chọn
+app.use(cors(corsOptions));
 
 // Cấu hình Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert({
-    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"), // Xử lý ký tự xuống dòng
+    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
     client_email: process.env.FIREBASE_CLIENT_EMAIL,
     project_id: process.env.FIREBASE_PROJECT_ID,
   }),
-  storageBucket: "nodejs-crud-61f88.appspot.com", // Thay bằng URL bucket của bạn
+  storageBucket: "nodejs-crud-61f88.appspot.com",
 });
 
 const db = admin.firestore();
@@ -32,12 +29,9 @@ const bucket = admin.storage().bucket();
 const collection = db.collection("products");
 
 // Cấu hình Multer để lưu tạm ảnh trên server trước khi upload lên Firebase
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
 
 // 1. Thêm sản phẩm (POST /add-product)
-// Đúng phần backend lưu sản phẩm vào 'products' collection
-app.post("/add-product", upload.single("image"), async (req, res) => {
+app.post("/add-product", async (req, res) => {
   try {
     const { name, description } = req.body;
     const file = req.file;
@@ -111,16 +105,16 @@ app.get("/product/:id", async (req, res) => {
 // 4. Sửa sản phẩm (PUT /product/:id)
 
 // 4. Sửa sản phẩm (PUT /product/:id)
-app.put('/product/:id', upload.single('image'), async (req, res) => {
+app.put("/product/:id", upload.single("image"), async (req, res) => {
   try {
     const { name, description } = req.body;
     const file = req.file;
     let imageUrl;
 
     // Lấy thông tin sản phẩm hiện tại từ Firestore để xóa ảnh cũ
-    const productDoc = await db.collection('products').doc(req.params.id).get();
+    const productDoc = await db.collection("products").doc(req.params.id).get();
     if (!productDoc.exists) {
-      return res.status(404).send('Product not found');
+      return res.status(404).send("Product not found");
     }
     const currentData = productDoc.data();
     const oldImageUrl = currentData.imageUrl;
@@ -135,43 +129,41 @@ app.put('/product/:id', upload.single('image'), async (req, res) => {
         contentType: file.mimetype,
       });
 
-      blobStream.on('error', (err) => {
-        console.error('Error uploading file:', err);
-        return res.status(500).send({ message: 'Error uploading image' });
+      blobStream.on("error", (err) => {
+        console.error("Error uploading file:", err);
+        return res.status(500).send({ message: "Error uploading image" });
       });
 
-      blobStream.on('finish', async () => {
+      blobStream.on("finish", async () => {
         imageUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
         await blob.makePublic();
 
         // Xóa ảnh cũ trong Firebase Storage nếu có
         if (oldImageUrl) {
-          const oldFileName = oldImageUrl.split('/').pop();
+          const oldFileName = oldImageUrl.split("/").pop();
           await bucket.file(oldFileName).delete();
         }
 
         // Cập nhật URL ảnh mới trong Firestore
         const updatedData = { name, description, imageUrl };
-        await db.collection('products').doc(req.params.id).update(updatedData);
-        return res.status(200).send({ message: 'Product updated successfully', imageUrl });
+        await db.collection("products").doc(req.params.id).update(updatedData);
+        return res
+          .status(200)
+          .send({ message: "Product updated successfully", imageUrl });
       });
 
       blobStream.end(file.buffer);
     } else {
       // Nếu không có file mới, chỉ cập nhật tên và mô tả
       const updatedData = { name, description };
-      await db.collection('products').doc(req.params.id).update(updatedData);
-      return res.status(200).send({ message: 'Product updated successfully' });
+      await db.collection("products").doc(req.params.id).update(updatedData);
+      return res.status(200).send({ message: "Product updated successfully" });
     }
-
   } catch (error) {
-    console.error('Error updating product:', error);
-    return res.status(500).send('Error updating product: ' + error.message);
+    console.error("Error updating product:", error);
+    return res.status(500).send("Error updating product: " + error.message);
   }
 });
-
-
-
 
 // 5. Xóa sản phẩm (DELETE /product/:id)
 app.delete("/product/:id", async (req, res) => {
